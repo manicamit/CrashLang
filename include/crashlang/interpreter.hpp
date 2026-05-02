@@ -84,6 +84,7 @@ private:
     Value eval_deref(const DerefExpr& expr);
     Value eval_move(const MoveExpr& expr);
     Value eval_lambda(const LambdaExpr& expr);
+    Value eval_match(const MatchExpr& expr);
 
     // ── Function calls ─────────────────────────────────────────────────────────
 

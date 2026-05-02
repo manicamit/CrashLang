@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        compiler: [gcc, clang]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y cmake
+
+    - name: Configure (GCC)
+      if: matrix.compiler == 'gcc'
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++
+
+    - name: Configure (Clang)
+      if: matrix.compiler == 'clang'
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Run tests
+      run: bash tests/run_tests.sh
+
+  asan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure with ASan
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DSANITIZE=ON
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Run tests under ASan
+      run: bash tests/run_tests.sh

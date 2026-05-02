@@ -48,6 +48,8 @@ struct NewExpr;
 struct RefExpr;
 struct DerefExpr;
 struct MoveExpr;
+struct LambdaExpr;
+struct MatchExpr;
 
 struct ExprStmt;
 struct LetStmt;

@@ -33,6 +33,8 @@ const char* token_type_name(TokenType type) {
         case TokenType::Ref:           return "Ref";
         case TokenType::Deref:         return "Deref";
         case TokenType::Move:          return "Move";
+        case TokenType::Match:         return "Match";
+        case TokenType::When:          return "When";
 
         case TokenType::Identifier:    return "Identifier";
 
@@ -49,6 +51,7 @@ const char* token_type_name(TokenType type) {
         case TokenType::Gt:            return "Gt";
         case TokenType::GtEq:          return "GtEq";
         case TokenType::Dot:           return "Dot";
+        case TokenType::Arrow:         return "Arrow";
 
         case TokenType::LParen:        return "LParen";
         case TokenType::RParen:        return "RParen";
@@ -83,6 +86,7 @@ const char* token_type_symbol(TokenType type) {
         case TokenType::Gt:        return ">";
         case TokenType::GtEq:      return ">=";
         case TokenType::Dot:       return ".";
+        case TokenType::Arrow:     return "=>";
         case TokenType::LParen:    return "(";
         case TokenType::RParen:    return ")";
         case TokenType::LBrace:    return "{";
@@ -114,6 +118,8 @@ const char* token_type_symbol(TokenType type) {
         case TokenType::Ref:       return "ref";
         case TokenType::Deref:     return "deref";
         case TokenType::Move:      return "move";
+        case TokenType::Match:     return "match";
+        case TokenType::When:      return "when";
 
         default:                   return nullptr;
     }

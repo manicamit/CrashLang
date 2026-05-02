@@ -1,17 +1,20 @@
 /// CrashLang entry point — file runner and interactive REPL.
 
 #include "crashlang/ast.hpp"
+#include "crashlang/compiler.hpp"
 #include "crashlang/diagnostics.hpp"
 #include "crashlang/errors.hpp"
 #include "crashlang/interpreter.hpp"
 #include "crashlang/lexer.hpp"
+#include "crashlang/optimizer.hpp"
 #include "crashlang/parser.hpp"
 #include "crashlang/source.hpp"
+#include "crashlang/vm.hpp"
 
 #include <cstring>
 #include <iostream>
 
-static const char* VERSION = "0.3.0";
+static const char* VERSION = "0.4.0";
 
 static void print_version() {
     std::cout << "CrashLang " << VERSION << '\n';
@@ -27,6 +30,9 @@ static void print_usage() {
         "  crashlang --ast <file.cl>         Dump AST and exit\n"
         "  crashlang --no-color <file.cl>    Disable ANSI colors in output\n"
         "  crashlang --check-leaks <file.cl> Report memory leaks at exit\n"
+        "  crashlang --vm <file.cl>          Execute via bytecode VM\n"
+        "  crashlang --disasm <file.cl>      Dump compiled bytecode\n"
+        "  crashlang --optimize <file.cl>    Run with constant folding\n"
         "  crashlang --version               Show version\n"
         "  crashlang --help                  Show this help\n";
 }
@@ -115,7 +121,9 @@ static int run_repl(bool no_color) {
 
 static int run_file(const char* filename,
                      bool show_tokens, bool show_ast,
-                     bool no_color, bool check_leaks)
+                     bool no_color, bool check_leaks,
+                     bool use_vm, bool show_disasm,
+                     bool optimize)
 {
     auto source = crashlang::load_source_file(filename);
     if (!source) return 1;
@@ -152,6 +160,50 @@ static int run_file(const char* filename,
     if (show_tokens) return 0;
 
     crashlang::DiagnosticsEngine diag(!no_color);
+
+    // ── Optimizer pass ─────────────────────────────────────────────────────────
+    if (optimize) {
+        crashlang::Optimizer opt;
+        opt.optimize(program);
+        if (opt.optimizations_applied() > 0) {
+            std::cerr << "[optimizer] " << opt.optimizations_applied()
+                      << " constant folding(s) applied.\n";
+        }
+    }
+
+    // ── VM path ────────────────────────────────────────────────────────────────
+    if (use_vm || show_disasm) {
+        crashlang::Compiler compiler(*source);
+        auto chunk = compiler.compile(program);
+
+        if (compiler.had_errors()) {
+            std::cerr << "Compilation failed.\n";
+            return 1;
+        }
+
+        if (show_disasm) {
+            std::cout << chunk.disassemble();
+            return 0;
+        }
+
+        crashlang::VM vm(*source);
+        try {
+            vm.execute(chunk);
+        } catch (const crashlang::CrashError& err) {
+            std::cerr << diag.format_crash(err, *source, vm.heap(), vm.ownership());
+            return 1;
+        }
+
+        if (check_leaks) {
+            auto leak_report = diag.format_leaks(vm.heap(), vm.ownership(), *source);
+            if (!leak_report.empty()) {
+                std::cerr << leak_report;
+            }
+        }
+        return 0;
+    }
+
+    // ── Tree-walk path (default) ───────────────────────────────────────────────
     crashlang::Interpreter interp(*source);
 
     try {
@@ -178,6 +230,9 @@ int main(int argc, char* argv[]) {
     bool        show_ast    = false;
     bool        no_color    = false;
     bool        check_leaks = false;
+    bool        use_vm      = false;
+    bool        show_disasm = false;
+    bool        optimize    = false;
     const char* filename    = nullptr;
 
     for (int i = 1; i < argc; ++i) {
@@ -189,6 +244,12 @@ int main(int argc, char* argv[]) {
             no_color = true;
         } else if (std::strcmp(argv[i], "--check-leaks") == 0) {
             check_leaks = true;
+        } else if (std::strcmp(argv[i], "--vm") == 0) {
+            use_vm = true;
+        } else if (std::strcmp(argv[i], "--disasm") == 0) {
+            show_disasm = true;
+        } else if (std::strcmp(argv[i], "--optimize") == 0) {
+            optimize = true;
         } else if (std::strcmp(argv[i], "--help") == 0
                 || std::strcmp(argv[i], "-h") == 0) {
             print_usage();
@@ -206,5 +267,5 @@ int main(int argc, char* argv[]) {
         return run_repl(no_color);
     }
 
-    return run_file(filename, show_tokens, show_ast, no_color, check_leaks);
+    return run_file(filename, show_tokens, show_ast, no_color, check_leaks, use_vm, show_disasm, optimize);
 }

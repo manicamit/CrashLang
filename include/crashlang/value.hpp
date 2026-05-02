@@ -18,11 +18,15 @@
 
 namespace crashlang {
 
+// Forward declaration for upvalue support in the VM.
+struct ObjUpvalue;
+
 // ── Forward declarations ───────────────────────────────────────────────────────
 
 struct Value;
 struct Stmt;
 struct Scope;
+struct Chunk;
 
 // ── Value types ────────────────────────────────────────────────────────────────
 
@@ -54,8 +58,10 @@ struct ArrayValue {
 struct FunctionValue {
     std::string              name;
     std::vector<std::string> params;
-    const Stmt*              body;           // Non-owning pointer into the AST.
+    const Stmt*              body = nullptr; // Non-owning pointer into the AST (tree-walk).
     std::shared_ptr<Scope>   closure;        // Captured environment at definition.
+    std::shared_ptr<Chunk>   compiled;       // Compiled bytecode (VM path). Null for tree-walk.
+    std::shared_ptr<std::vector<ObjUpvalue*>> vm_upvalues; // Captured upvalues (VM path).
 
     bool operator==(const FunctionValue& o) const { return name == o.name && body == o.body; }
     bool operator!=(const FunctionValue& o) const { return !(*this == o); }

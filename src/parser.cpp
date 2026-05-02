@@ -727,6 +727,44 @@ ExprPtr Parser::parse_primary() {
         }
     }
 
+    // ── Match expression: match expr { when pat => body, ... } ──────────────
+    if (match(TokenType::Match)) {
+        auto kw = previous();
+        auto target = parse_expression();
+        expect(TokenType::LBrace, "expected '{' after match target");
+
+        std::vector<MatchArm> arms;
+        while (!check(TokenType::RBrace) && !is_at_end()) {
+            expect(TokenType::When, "expected 'when' in match arm");
+
+            MatchArm arm;
+            // Check for wildcard '_'.
+            if (check(TokenType::Identifier) && peek().lexeme == "_") {
+                advance(); // Consume '_'.
+                arm.is_wildcard = true;
+                arm.pattern = nullptr;
+            } else {
+                arm.pattern = parse_expression();
+            }
+
+            expect(TokenType::Arrow, "expected '=>' after match pattern");
+            arm.body = parse_expression();
+
+            // Optional comma separator between arms.
+            match(TokenType::Comma);
+
+            arms.push_back(std::move(arm));
+        }
+
+        auto close = expect(TokenType::RBrace, "expected '}' to close match expression");
+        auto span = Span::merge(kw.span, close.span);
+        MatchExpr node;
+        node.keyword = kw;
+        node.target = std::move(target);
+        node.arms = std::move(arms);
+        return Expr::make(std::move(node), span);
+    }
+
     // ── Error ──────────────────────────────────────────────────────────────────
     error("expected expression, got '" + peek().lexeme + "'");
     synchronize();

@@ -190,6 +190,92 @@ else
     printf "  $(red "FAIL")  --help\n"
 fi
 
+# ── Phase 8: Bytecode VM ───────────────────────────────────────────────────────
+
+echo ""
+bold "Phase 8: Bytecode VM"
+echo ""
+
+expect_success "VM smoke test (arithmetic, functions, recursion, for-in, lambdas)" \
+    "examples/12_vm_test.cl" \
+    "All VM tests passed." \
+    "--vm"
+
+# Disasm flag.
+output=$($BINARY --disasm examples/12_vm_test.cl 2>&1)
+if echo "$output" | grep -qF "OP_CONSTANT"; then
+    PASS=$((PASS + 1))
+    printf "  $(green "PASS")  --disasm output\n"
+else
+    FAIL=$((FAIL + 1))
+    printf "  $(red "FAIL")  --disasm output\n"
+fi
+
+# VM crash detection.
+if output=$($BINARY --vm --no-color examples/03_error_test.cl 2>&1); then
+    FAIL=$((FAIL + 1))
+    printf "  $(red "FAIL")  VM crash detection — expected crash\n"
+else
+    if echo "$output" | grep -qF "TypeMismatch"; then
+        PASS=$((PASS + 1))
+        printf "  $(green "PASS")  VM crash detection\n"
+    else
+        FAIL=$((FAIL + 1))
+        printf "  $(red "FAIL")  VM crash detection — wrong error\n"
+    fi
+fi
+
+# ── Phase 11: Advanced compiler features ───────────────────────────────────────
+
+echo ""
+bold "Phase 11: Advanced compiler features"
+echo ""
+
+# Closures with mutable upvalues (interpreter).
+expect_success "Closures — mutable upvalue (interpreter)" \
+    "tests/examples/closure_counter.cl" \
+    "3"
+
+# Closures with mutable upvalues (VM).
+expect_success "Closures — mutable upvalue (VM)" \
+    "tests/examples/closure_counter.cl" \
+    "3" \
+    "--vm"
+
+# Match expressions (interpreter).
+expect_success "Match expression (interpreter)" \
+    "tests/examples/match_expr.cl" \
+    "two"
+
+# Match expressions (VM).
+expect_success "Match expression (VM)" \
+    "tests/examples/match_expr.cl" \
+    "two" \
+    "--vm"
+
+# Break and continue (interpreter).
+expect_success "Break/continue (interpreter)" \
+    "tests/examples/break_continue.cl" \
+    "23"
+
+# Break and continue (VM).
+expect_success "Break/continue (VM)" \
+    "tests/examples/break_continue.cl" \
+    "23" \
+    "--vm"
+
+# Constant folding optimizer (interpreter path).
+expect_success "Constant folding optimizer (interpreter)" \
+    "tests/examples/constant_folding.cl" \
+    "25" \
+    "--optimize"
+
+# Constant folding optimizer (VM path).
+expect_success "Constant folding optimizer (VM)" \
+    "tests/examples/constant_folding.cl" \
+    "25" \
+    "--optimize --vm"
+
 # ── Summary ─────────────────────────────────────────────────────────────────────
 
 echo ""

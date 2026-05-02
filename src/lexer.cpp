@@ -30,6 +30,8 @@ const std::unordered_map<std::string, TokenType> Lexer::keywords_ = {
     {"ref",      TokenType::Ref},
     {"deref",    TokenType::Deref},
     {"move",     TokenType::Move},
+    {"match",    TokenType::Match},
+    {"when",     TokenType::When},
 };
 
 // ── Constructor ────────────────────────────────────────────────────────────────
@@ -137,7 +139,11 @@ void Lexer::scan_token() {
 
         // ── Two-character tokens ───────────────────────────────────────────────
         case '=':
-            add_token(match('=') ? TokenType::EqEq : TokenType::Eq);
+            if (match('>')) {
+                add_token(TokenType::Arrow);
+            } else {
+                add_token(match('=') ? TokenType::EqEq : TokenType::Eq);
+            }
             return;
 
         case '!':

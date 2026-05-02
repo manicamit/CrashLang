@@ -116,6 +116,19 @@ std::string format_expr(const Expr& expr, int indent) {
             result += format_stmt(*node.body, indent + 1);
             return result;
         }
+        else if constexpr (std::is_same_v<T, MatchExpr>) {
+            std::string result = pad + "Match\n";
+            result += format_expr(*node.target, indent + 1);
+            for (const auto& arm : node.arms) {
+                if (arm.is_wildcard) {
+                    result += pad + "  When _\n";
+                } else {
+                    result += pad + "  When\n" + format_expr(*arm.pattern, indent + 2);
+                }
+                result += format_expr(*arm.body, indent + 2);
+            }
+            return result;
+        }
         else {
             return pad + "<unknown expr>";
         }

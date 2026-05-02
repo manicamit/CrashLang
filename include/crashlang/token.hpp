@@ -46,6 +46,8 @@ enum class TokenType {
     Ref,              // ref
     Deref,            // deref
     Move,             // move
+    Match,            // match
+    When,             // when
 
     // ── Identifiers ────────────────────────────────────────────────────────────
     Identifier,       // foo, bar, my_var
@@ -66,6 +68,7 @@ enum class TokenType {
     GtEq,             // >=
 
     Dot,              // .
+    Arrow,            // =>
 
     // ── Delimiters ─────────────────────────────────────────────────────────────
     LParen,           // (

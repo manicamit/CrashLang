@@ -122,6 +122,20 @@ struct LambdaExpr {
     StmtPtr            body;   // Always a BlockStmt.
 };
 
+/// A single arm of a match expression.
+struct MatchArm {
+    ExprPtr pattern;   // nullptr for wildcard `_`.
+    ExprPtr body;      // The expression to evaluate if matched.
+    bool    is_wildcard = false;
+};
+
+/// Match expression: `match expr { when 1 => ..., when _ => ... }`.
+struct MatchExpr {
+    Token                  keyword; // 'match'.
+    ExprPtr                target;  // The value being matched.
+    std::vector<MatchArm>  arms;
+};
+
 /// The variant holding all expression types.
 using ExprData = std::variant<
     LiteralExpr,
@@ -137,7 +151,8 @@ using ExprData = std::variant<
     RefExpr,
     DerefExpr,
     MoveExpr,
-    LambdaExpr
+    LambdaExpr,
+    MatchExpr
 >;
 
 /// An expression node. Wraps ExprData + source Span.

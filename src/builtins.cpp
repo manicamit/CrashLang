@@ -9,6 +9,18 @@
 
 namespace crashlang {
 
+// ── User function caller mechanism ─────────────────────────────────────────────
+
+static UserFnCaller s_user_fn_caller;
+
+void set_user_fn_caller(UserFnCaller caller) {
+    s_user_fn_caller = std::move(caller);
+}
+
+const UserFnCaller& get_user_fn_caller() {
+    return s_user_fn_caller;
+}
+
 // ── Helper macros ──────────────────────────────────────────────────────────────
 
 /// Register a built-in with fixed arity.
@@ -266,12 +278,13 @@ void register_builtins(Environment& env) {
             if (args[1].is_builtin()) {
                 result_elems->push_back(args[1].as_builtin().fn(std::move(call_args), span));
             } else {
-                // For user functions, we use a simplified direct call.
-                // The interpreter's call_function handles scope, but we don't
-                // have access to it here. Instead, we throw a special signal.
-                BUILTIN_ERROR(CrashKind::InvalidOperation,
-                    "map() with user-defined functions requires using a for loop instead. "
-                    "Use: for item in arr { ... }");
+                const auto& caller = get_user_fn_caller();
+                if (caller) {
+                    result_elems->push_back(caller(args[1], std::move(call_args), span));
+                } else {
+                    BUILTIN_ERROR(CrashKind::InvalidOperation,
+                        "map() cannot call user functions in this context");
+                }
             }
         }
         ArrayValue arr;
@@ -293,14 +306,20 @@ void register_builtins(Environment& env) {
         auto result_elems = std::make_shared<std::vector<Value>>();
         for (const auto& elem : src) {
             std::vector<Value> call_args = {elem};
+            Value test;
             if (args[1].is_builtin()) {
-                Value test = args[1].as_builtin().fn(std::move(call_args), span);
-                if (value_is_truthy(test)) {
-                    result_elems->push_back(elem);
-                }
+                test = args[1].as_builtin().fn(std::move(call_args), span);
             } else {
-                BUILTIN_ERROR(CrashKind::InvalidOperation,
-                    "filter() with user-defined functions requires using a for loop instead");
+                const auto& caller = get_user_fn_caller();
+                if (caller) {
+                    test = caller(args[1], std::move(call_args), span);
+                } else {
+                    BUILTIN_ERROR(CrashKind::InvalidOperation,
+                        "filter() cannot call user functions in this context");
+                }
+            }
+            if (value_is_truthy(test)) {
+                result_elems->push_back(elem);
             }
         }
         ArrayValue arr;
@@ -324,8 +343,13 @@ void register_builtins(Environment& env) {
             if (args[1].is_builtin()) {
                 args[1].as_builtin().fn(std::move(call_args), span);
             } else {
-                BUILTIN_ERROR(CrashKind::InvalidOperation,
-                    "forEach() with user-defined functions requires using a for loop instead");
+                const auto& caller = get_user_fn_caller();
+                if (caller) {
+                    caller(args[1], std::move(call_args), span);
+                } else {
+                    BUILTIN_ERROR(CrashKind::InvalidOperation,
+                        "forEach() cannot call user functions in this context");
+                }
             }
         }
         return Value(NilType{});

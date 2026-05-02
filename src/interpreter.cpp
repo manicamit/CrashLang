@@ -12,6 +12,17 @@ Interpreter::Interpreter(const SourceFile& source)
 {
     // Register all built-in functions into the global scope.
     register_builtins(env_);
+
+    // Allow builtins like map/filter/forEach to call user-defined functions
+    // by routing through this interpreter's call_function method.
+    set_user_fn_caller([this](const Value& fn_val, std::vector<Value> args, Span span) -> Value {
+        if (fn_val.is_function()) {
+            return call_function(fn_val.as_function(), std::move(args), span);
+        }
+        auto err = make_error(CrashKind::NotCallable, span,
+            "expected a function, got " + std::string(value_type_name(fn_val)));
+        throw err;
+    });
 }
 
 // ── Top-level execute ──────────────────────────────────────────────────────────
@@ -224,6 +235,7 @@ Value Interpreter::evaluate(const Expr& expr) {
         else if constexpr (std::is_same_v<T, DerefExpr>)       return eval_deref(node);
         else if constexpr (std::is_same_v<T, MoveExpr>)        return eval_move(node);
         else if constexpr (std::is_same_v<T, LambdaExpr>)      return eval_lambda(node);
+        else if constexpr (std::is_same_v<T, MatchExpr>)       return eval_match(node);
         else return Value{};
     }, expr.data);
 }
@@ -837,6 +849,24 @@ void Interpreter::binary_type_error(const std::string& op,
 std::string Interpreter::current_function_name() const {
     if (call_stack_.empty()) return "<main>";
     return call_stack_.back().function_name;
+}
+
+// ── Match expression ───────────────────────────────────────────────────────────
+
+Value Interpreter::eval_match(const MatchExpr& expr) {
+    Value target = evaluate(*expr.target);
+
+    for (const auto& arm : expr.arms) {
+        if (arm.is_wildcard) {
+            return evaluate(*arm.body);
+        }
+        Value pattern = evaluate(*arm.pattern);
+        if (values_equal(target, pattern)) {
+            return evaluate(*arm.body);
+        }
+    }
+
+    return Value(NilType{});
 }
 
 } // namespace crashlang
