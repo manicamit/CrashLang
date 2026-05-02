@@ -5,9 +5,6 @@
 #include <sstream>
 
 namespace crashlang {
-
-// ── SourceLocation ─────────────────────────────────────────────────────────────
-
 std::string SourceLocation::to_string() const {
     std::string result;
     if (file) {
@@ -27,9 +24,6 @@ bool SourceLocation::operator==(const SourceLocation& other) const {
 bool SourceLocation::operator!=(const SourceLocation& other) const {
     return !(*this == other);
 }
-
-// ── Span ───────────────────────────────────────────────────────────────────────
-
 Span Span::merge(const Span& a, const Span& b) {
     return Span{a.start, b.end};
 }
@@ -41,9 +35,6 @@ std::string Span::to_string() const {
 bool Span::is_valid() const {
     return start.line > 0 && start.column > 0;
 }
-
-// ── SourceFile ─────────────────────────────────────────────────────────────────
-
 SourceFile::SourceFile(std::string filename_, std::string source_)
     : filename(std::move(filename_))
     , source(std::move(source_))
@@ -108,9 +99,6 @@ SourceLocation SourceFile::location_from_offset(size_t offset) const {
 
     return SourceLocation{this, line, col};
 }
-
-// ── File loading ───────────────────────────────────────────────────────────────
-
 std::unique_ptr<SourceFile> load_source_file(const std::string& path) {
     std::ifstream file(path, std::ios::in | std::ios::binary);
     if (!file.is_open()) {

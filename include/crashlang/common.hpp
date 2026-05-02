@@ -1,31 +1,18 @@
 #ifndef CRASHLANG_COMMON_HPP
 #define CRASHLANG_COMMON_HPP
 
-/// CrashLang — common type aliases and forward declarations.
-///
-/// This header is included by nearly every other header. Keep it light:
-/// only type aliases, constants, and forward declarations belong here.
-
 #include <cstdint>
 #include <string>
 
 namespace crashlang {
 
-// ── Numeric aliases ────────────────────────────────────────────────────────────
-
-/// Unique identifier for a heap-allocated object.
 using HeapID = uint64_t;
-
-/// Source position types. 1-indexed (line 1, column 1 is the first character).
 using LineNo = uint32_t;
 using ColNo  = uint32_t;
 
-// ── Sentinel values ────────────────────────────────────────────────────────────
-
-/// Invalid / uninitialized heap ID.
 constexpr HeapID INVALID_HEAP_ID = 0;
 
-// ── Forward declarations ───────────────────────────────────────────────────────
+// Forward declarations.
 
 struct SourceFile;
 struct SourceLocation;
@@ -33,7 +20,6 @@ struct Span;
 
 struct Token;
 
-// AST — defined as variant types in ast.hpp
 struct LiteralExpr;
 struct IdentifierExpr;
 struct UnaryExpr;
@@ -73,4 +59,4 @@ class DiagnosticsEngine;
 
 } // namespace crashlang
 
-#endif // CRASHLANG_COMMON_HPP
+#endif

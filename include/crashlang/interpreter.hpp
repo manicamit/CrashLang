@@ -1,13 +1,6 @@
 #ifndef CRASHLANG_INTERPRETER_HPP
 #define CRASHLANG_INTERPRETER_HPP
 
-/// Tree-walk interpreter for CrashLang.
-///
-/// Recursively evaluates AST nodes. Maintains an Environment for variable
-/// bindings, a HeapSimulator for memory modeling, and an OwnershipTracker
-/// for lifetime event recording. Tracks the call stack for crash reports
-/// and enforces the stack depth limit for StackOverflow detection.
-
 #include "crashlang/ast.hpp"
 #include "crashlang/environment.hpp"
 #include "crashlang/errors.hpp"
@@ -23,21 +16,14 @@ namespace crashlang {
 
 class Interpreter {
 public:
-    /// Maximum call depth before StackOverflow is raised.
     static constexpr size_t MAX_CALL_DEPTH = 256;
 
     explicit Interpreter(const SourceFile& source);
 
-    /// Execute a fully parsed program.
     void execute(const Program& program);
-
-    /// Did execution complete without a crash?
     bool ok() const { return !crashed_; }
 
-    /// Access the heap (for diagnostics in main.cpp).
-    const HeapSimulator& heap() const { return heap_; }
-
-    /// Access the ownership tracker (for diagnostics in main.cpp).
+    const HeapSimulator&    heap() const { return heap_; }
     const OwnershipTracker& ownership() const { return ownership_; }
 
 private:
@@ -46,14 +32,9 @@ private:
     HeapSimulator      heap_;
     OwnershipTracker   ownership_;
     bool               crashed_ = false;
-
-    /// Active call stack (grows on function calls, shrinks on return).
     std::vector<CallFrame> call_stack_;
 
-    /// Get the name of the currently executing function (for ownership events).
     std::string current_function_name() const;
-
-    // ── Statement execution ────────────────────────────────────────────────────
 
     void execute_stmt(const Stmt& stmt);
     void execute_block(const BlockStmt& block);
@@ -66,8 +47,6 @@ private:
     void execute_break(const BreakStmt& stmt);
     void execute_continue(const ContinueStmt& stmt);
     void execute_free(const FreeStmt& stmt);
-
-    // ── Expression evaluation ──────────────────────────────────────────────────
 
     Value evaluate(const Expr& expr);
     Value eval_literal(const LiteralExpr& expr);
@@ -86,34 +65,17 @@ private:
     Value eval_lambda(const LambdaExpr& expr);
     Value eval_match(const MatchExpr& expr);
 
-    // ── Function calls ─────────────────────────────────────────────────────────
+    Value call_function(const FunctionValue& fn, std::vector<Value> args, Span call_site);
+    Value call_builtin(const BuiltinValue& builtin, std::vector<Value> args, Span call_site);
 
-    Value call_function(const FunctionValue& fn,
-                        std::vector<Value> args,
-                        Span call_site);
-
-    Value call_builtin(const BuiltinValue& builtin,
-                       std::vector<Value> args,
-                       Span call_site);
-
-    // ── Error helpers ──────────────────────────────────────────────────────────
-
-    /// Build a CrashError with the current call stack attached.
     CrashError make_error(CrashKind kind, Span location, std::string detail) const;
 
-    /// Throw a type mismatch error.
-    [[noreturn]] void type_error(const std::string& op,
-                                 const Value& got,
-                                 const char* expected,
-                                 Span location);
-
-    /// Throw a type mismatch error for binary operators.
-    [[noreturn]] void binary_type_error(const std::string& op,
-                                        const Value& left,
-                                        const Value& right,
-                                        Span location);
+    [[noreturn]] void type_error(const std::string& op, const Value& got,
+                                 const char* expected, Span location);
+    [[noreturn]] void binary_type_error(const std::string& op, const Value& left,
+                                        const Value& right, Span location);
 };
 
 } // namespace crashlang
 
-#endif // CRASHLANG_INTERPRETER_HPP
+#endif

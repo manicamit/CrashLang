@@ -1,13 +1,7 @@
 #include "crashlang/ownership.hpp"
 
 namespace crashlang {
-
-// ── Static empty timeline ──────────────────────────────────────────────────────
-
 const std::vector<OwnershipEvent> OwnershipTracker::empty_timeline_;
-
-// ── Event kind names ───────────────────────────────────────────────────────────
-
 const char* ownership_event_kind_name(OwnershipEvent::Kind kind) {
     switch (kind) {
         case OwnershipEvent::Allocated:        return "new()";
@@ -21,9 +15,6 @@ const char* ownership_event_kind_name(OwnershipEvent::Kind kind) {
     }
     return "???";
 }
-
-// ── record_allocation ──────────────────────────────────────────────────────────
-
 void OwnershipTracker::record_allocation(HeapID id,
                                           std::string var_name,
                                           std::string type_name,
@@ -45,9 +36,6 @@ void OwnershipTracker::record_allocation(HeapID id,
     records_.emplace(id, std::move(record));
     var_to_heap_[var_name] = id;
 }
-
-// ── record_free ────────────────────────────────────────────────────────────────
-
 void OwnershipTracker::record_free(HeapID id,
                                     Span location,
                                     std::string function_name)
@@ -62,9 +50,6 @@ void OwnershipTracker::record_free(HeapID id,
     event.function_name = std::move(function_name);
     it->second.timeline.push_back(std::move(event));
 }
-
-// ── record_move ────────────────────────────────────────────────────────────────
-
 void OwnershipTracker::record_move(HeapID id,
                                     std::string from_var,
                                     std::string to_var,
@@ -92,9 +77,6 @@ void OwnershipTracker::record_move(HeapID id,
     var_to_heap_.erase(from_var);
     var_to_heap_[to_var] = id;
 }
-
-// ── record_reference ───────────────────────────────────────────────────────────
-
 void OwnershipTracker::record_reference(HeapID id,
                                          std::string ref_var,
                                          Span location,
@@ -110,9 +92,6 @@ void OwnershipTracker::record_reference(HeapID id,
     event.function_name = std::move(function_name);
     it->second.timeline.push_back(std::move(event));
 }
-
-// ── record_dereference ─────────────────────────────────────────────────────────
-
 void OwnershipTracker::record_dereference(HeapID id,
                                            Span location,
                                            std::string function_name)
@@ -127,9 +106,6 @@ void OwnershipTracker::record_dereference(HeapID id,
     event.function_name = std::move(function_name);
     it->second.timeline.push_back(std::move(event));
 }
-
-// ── record_field_access ────────────────────────────────────────────────────────
-
 void OwnershipTracker::record_field_access(HeapID id,
                                             const std::string& field,
                                             bool is_write,
@@ -147,9 +123,6 @@ void OwnershipTracker::record_field_access(HeapID id,
     event.function_name = std::move(function_name);
     it->second.timeline.push_back(std::move(event));
 }
-
-// ── record_pass_to_function ────────────────────────────────────────────────────
-
 void OwnershipTracker::record_pass_to_function(HeapID id,
                                                 const std::string& callee_name,
                                                 Span location,
@@ -165,9 +138,6 @@ void OwnershipTracker::record_pass_to_function(HeapID id,
     event.function_name = std::move(function_name);
     it->second.timeline.push_back(std::move(event));
 }
-
-// ── Queries ────────────────────────────────────────────────────────────────────
-
 const std::vector<OwnershipEvent>& OwnershipTracker::get_timeline(HeapID id) const {
     auto it = records_.find(id);
     if (it == records_.end()) return empty_timeline_;

@@ -3,9 +3,6 @@
 #include <iomanip>
 
 namespace crashlang {
-
-// ── token_type_name ────────────────────────────────────────────────────────────
-
 const char* token_type_name(TokenType type) {
     switch (type) {
         case TokenType::IntLiteral:    return "IntLiteral";
@@ -68,9 +65,6 @@ const char* token_type_name(TokenType type) {
     }
     return "Unknown";
 }
-
-// ── token_type_symbol ──────────────────────────────────────────────────────────
-
 const char* token_type_symbol(TokenType type) {
     switch (type) {
         case TokenType::Plus:      return "+";
@@ -124,9 +118,6 @@ const char* token_type_symbol(TokenType type) {
         default:                   return nullptr;
     }
 }
-
-// ── Token factories ────────────────────────────────────────────────────────────
-
 Token Token::make(TokenType type, std::string lexeme, Span span) {
     return Token{type, std::move(lexeme), span, std::monostate{}};
 }
@@ -150,9 +141,6 @@ Token Token::make_error(std::string message, Span span) {
 Token Token::make_eof(Span span) {
     return Token{TokenType::Eof, "", span, std::monostate{}};
 }
-
-// ── operator<< ─────────────────────────────────────────────────────────────────
-
 std::ostream& operator<<(std::ostream& os, const Token& token) {
     os << std::left << std::setw(14) << token_type_name(token.type);
     os << " " << std::setw(5) << token.span.to_string();

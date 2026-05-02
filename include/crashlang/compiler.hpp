@@ -1,15 +1,6 @@
 #ifndef CRASHLANG_COMPILER_HPP
 #define CRASHLANG_COMPILER_HPP
 
-/// AST-to-bytecode compiler for CrashLang.
-///
-/// Walks the AST produced by the parser and emits bytecode instructions
-/// into Chunk objects. Each function body compiles to its own Chunk.
-/// Local variable resolution is done at compile time using a scope stack,
-/// so the VM can use slot-indexed access instead of name lookups.
-/// Upvalue resolution enables closures to capture variables from enclosing
-/// scopes via heap-promoted upvalue slots.
-
 #include "crashlang/ast.hpp"
 #include "crashlang/bytecode.hpp"
 #include "crashlang/source.hpp"
@@ -20,36 +11,30 @@
 
 namespace crashlang {
 
-/// A local variable tracked during compilation.
 struct Local {
     std::string name;
-    int         depth;    // Scope depth where this local was declared.
+    int         depth;
     bool        initialized = false;
-    bool        is_captured = false; // True if an inner closure captures this local.
+    bool        is_captured = false;
 };
 
-/// An upvalue descriptor — identifies a captured variable.
 struct CompilerUpvalue {
-    uint8_t index;    // Slot in the enclosing scope (local or upvalue index).
-    bool    is_local; // True = captured from immediate enclosing locals, false = from upvalue.
+    uint8_t index;
+    bool    is_local;
 };
 
-/// Loop context for break/continue compilation.
 struct LoopContext {
-    size_t              start_offset;    // Where to jump for continue.
-    std::vector<size_t> break_patches;   // Jump offsets to patch for break.
-    int                 scope_depth;     // Scope depth at loop start (for popping locals).
+    size_t              start_offset;
+    std::vector<size_t> break_patches;
+    int                 scope_depth;
 };
 
-/// Compiler state for one function scope.
 struct CompilerScope {
     Chunk                        chunk;
     std::vector<Local>           locals;
     std::vector<CompilerUpvalue> upvalues;
     int                          scope_depth = 0;
     int                          upvalue_count = 0;
-
-    /// The enclosing compiler scope (nullptr for top-level).
     CompilerScope*               enclosing = nullptr;
 };
 
@@ -57,19 +42,14 @@ class Compiler {
 public:
     explicit Compiler(const SourceFile& source);
 
-    /// Compile a fully parsed program. Returns the top-level chunk.
     Chunk compile(const Program& program);
-
-    /// Were there compilation errors?
     bool had_errors() const { return had_error_; }
 
 private:
     const SourceFile&          source_;
-    CompilerScope*             current_ = nullptr;    // Active compilation scope.
+    CompilerScope*             current_ = nullptr;
     bool                       had_error_ = false;
-    std::vector<LoopContext>   loop_stack_;            // Active loop contexts.
-
-    // ── Scope management ───────────────────────────────────────────────────────
+    std::vector<LoopContext>   loop_stack_;
 
     void begin_scope();
     void end_scope(uint32_t line);
@@ -78,15 +58,8 @@ private:
     int resolve_local(const std::string& name) const;
     void add_local(const std::string& name);
 
-    // ── Upvalue resolution ─────────────────────────────────────────────────────
-
-    /// Resolve a variable name as an upvalue. Returns -1 if not captured.
     int resolve_upvalue(CompilerScope* scope, const std::string& name);
-
-    /// Add an upvalue to the current scope's upvalue array.
     int add_upvalue(CompilerScope* scope, uint8_t index, bool is_local);
-
-    // ── Statement compilation ──────────────────────────────────────────────────
 
     void compile_stmt(const Stmt& stmt);
     void compile_block(const BlockStmt& stmt);
@@ -100,8 +73,6 @@ private:
     void compile_expr_stmt(const ExprStmt& stmt);
     void compile_break(const BreakStmt& stmt);
     void compile_continue(const ContinueStmt& stmt);
-
-    // ── Expression compilation ─────────────────────────────────────────────────
 
     void compile_expr(const Expr& expr);
     void compile_literal(const LiteralExpr& expr, const Span& span);
@@ -120,13 +91,9 @@ private:
     void compile_lambda(const LambdaExpr& expr, const Span& span);
     void compile_match(const MatchExpr& expr, const Span& span);
 
-    // ── Function compilation ───────────────────────────────────────────────────
-
     Value compile_function_body(const std::string& name,
                                 const std::vector<Token>& params,
                                 const Stmt& body);
-
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     Chunk& current_chunk() { return current_->chunk; }
     void error(const std::string& message);
@@ -135,4 +102,4 @@ private:
 
 } // namespace crashlang
 
-#endif // CRASHLANG_COMPILER_HPP
+#endif

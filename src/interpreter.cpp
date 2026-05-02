@@ -4,9 +4,6 @@
 #include <sstream>
 
 namespace crashlang {
-
-// ── Constructor ────────────────────────────────────────────────────────────────
-
 Interpreter::Interpreter(const SourceFile& source)
     : source_(source)
 {
@@ -24,9 +21,6 @@ Interpreter::Interpreter(const SourceFile& source)
         throw err;
     });
 }
-
-// ── Top-level execute ──────────────────────────────────────────────────────────
-
 void Interpreter::execute(const Program& program) {
     try {
         for (const auto& stmt : program.statements) {
@@ -37,9 +31,6 @@ void Interpreter::execute(const Program& program) {
         throw; // Re-throw — main.cpp handles formatting and display.
     }
 }
-
-// ── Statement dispatch ─────────────────────────────────────────────────────────
-
 void Interpreter::execute_stmt(const Stmt& stmt) {
     std::visit([this, &stmt](auto&& node) {
         using T = std::decay_t<decltype(node)>;
@@ -57,9 +48,6 @@ void Interpreter::execute_stmt(const Stmt& stmt) {
         else if constexpr (std::is_same_v<T, FreeStmt>)     { execute_free(node); }
     }, stmt.data);
 }
-
-// ── Statements ─────────────────────────────────────────────────────────────────
-
 void Interpreter::execute_block(const BlockStmt& block) {
     env_.push_scope();
     try {
@@ -214,9 +202,6 @@ void Interpreter::execute_free(const FreeStmt& stmt) {
     heap_.free(id, stmt.keyword.span, fn_name);
     ownership_.record_free(id, stmt.keyword.span, fn_name);
 }
-
-// ── Expression dispatch ────────────────────────────────────────────────────────
-
 Value Interpreter::evaluate(const Expr& expr) {
     return std::visit([this](auto&& node) -> Value {
         using T = std::decay_t<decltype(node)>;
@@ -239,9 +224,6 @@ Value Interpreter::evaluate(const Expr& expr) {
         else return Value{};
     }, expr.data);
 }
-
-// ── Literal ────────────────────────────────────────────────────────────────────
-
 Value Interpreter::eval_literal(const LiteralExpr& expr) {
     switch (expr.value.type) {
         case TokenType::IntLiteral:
@@ -260,9 +242,6 @@ Value Interpreter::eval_literal(const LiteralExpr& expr) {
             return Value{};
     }
 }
-
-// ── Identifier lookup ──────────────────────────────────────────────────────────
-
 Value Interpreter::eval_identifier(const IdentifierExpr& expr) {
     auto val = env_.get(expr.name.lexeme);
     if (!val) {
@@ -280,9 +259,6 @@ Value Interpreter::eval_identifier(const IdentifierExpr& expr) {
     }
     return *val;
 }
-
-// ── Unary operators ────────────────────────────────────────────────────────────
-
 Value Interpreter::eval_unary(const UnaryExpr& expr) {
     Value operand = evaluate(*expr.operand);
 
@@ -298,9 +274,6 @@ Value Interpreter::eval_unary(const UnaryExpr& expr) {
 
     return Value{};
 }
-
-// ── Binary operators ───────────────────────────────────────────────────────────
-
 Value Interpreter::eval_binary(const BinaryExpr& expr) {
     // Short-circuit logical operators.
     if (expr.op.type == TokenType::And) {
@@ -408,9 +381,6 @@ Value Interpreter::eval_binary(const BinaryExpr& expr) {
             return Value{};
     }
 }
-
-// ── Function calls ─────────────────────────────────────────────────────────────
-
 Value Interpreter::eval_call(const CallExpr& expr) {
     Value callee = evaluate(*expr.callee);
 
@@ -465,7 +435,7 @@ Value Interpreter::call_function(const FunctionValue& fn,
     // Execute body.
     auto previous_scope = env_.current();
     env_.push_existing_scope(fn_scope);
-    
+
     Value result;
     try {
         execute_stmt(*fn.body);
@@ -500,9 +470,6 @@ Value Interpreter::call_builtin(const BuiltinValue& builtin,
 
     return builtin.fn(std::move(args), call_site);
 }
-
-// ── Index access ───────────────────────────────────────────────────────────────
-
 Value Interpreter::eval_index(const IndexExpr& expr) {
     Value obj   = evaluate(*expr.object);
     Value index = evaluate(*expr.index);
@@ -551,9 +518,6 @@ Value Interpreter::eval_index(const IndexExpr& expr) {
 
     return elements[static_cast<size_t>(idx)];
 }
-
-// ── Field access ───────────────────────────────────────────────────────────────
-
 Value Interpreter::eval_field_access(const FieldAccessExpr& expr) {
     Value obj = evaluate(*expr.object);
 
@@ -571,9 +535,6 @@ Value Interpreter::eval_field_access(const FieldAccessExpr& expr) {
     // HeapSimulator::read_field() throws UseAfterFree or InvalidFieldAccess.
     return heap_.read_field(id, expr.name.lexeme, expr.name.span);
 }
-
-// ── Assignment ─────────────────────────────────────────────────────────────────
-
 Value Interpreter::eval_assign(const AssignExpr& expr) {
     Value val = evaluate(*expr.value);
 
@@ -633,9 +594,6 @@ Value Interpreter::eval_assign(const AssignExpr& expr) {
 
     return val;
 }
-
-// ── Array literal ──────────────────────────────────────────────────────────────
-
 Value Interpreter::eval_array(const ArrayExpr& expr) {
     auto elements = std::make_shared<std::vector<Value>>();
     elements->reserve(expr.elements.size());
@@ -646,9 +604,6 @@ Value Interpreter::eval_array(const ArrayExpr& expr) {
     arr.elements = std::move(elements);
     return Value(std::move(arr));
 }
-
-// ── new — allocate on the simulated heap ───────────────────────────────────────
-
 Value Interpreter::eval_new(const NewExpr& expr) {
     auto fn_name = current_function_name();
 
@@ -677,9 +632,6 @@ Value Interpreter::eval_new(const NewExpr& expr) {
     ref.origin = expr.keyword.span;
     return Value(ref);
 }
-
-// ── ref — create a reference to a heap object ──────────────────────────────────
-
 Value Interpreter::eval_ref(const RefExpr& expr) {
     Value operand = evaluate(*expr.operand);
 
@@ -708,9 +660,6 @@ Value Interpreter::eval_ref(const RefExpr& expr) {
     ref.origin = expr.keyword.span;
     return Value(ref);
 }
-
-// ── deref — read through a reference ───────────────────────────────────────────
-
 Value Interpreter::eval_deref(const DerefExpr& expr) {
     Value operand = evaluate(*expr.operand);
 
@@ -743,9 +692,6 @@ Value Interpreter::eval_deref(const DerefExpr& expr) {
     // alive, not extracting a copy.
     return operand;
 }
-
-// ── move — transfer ownership ──────────────────────────────────────────────────
-
 Value Interpreter::eval_move(const MoveExpr& expr) {
     Value operand = evaluate(*expr.operand);
 
@@ -790,9 +736,6 @@ Value Interpreter::eval_move(const MoveExpr& expr) {
 
     return operand;
 }
-
-// ── lambda — anonymous function expression ─────────────────────────────────────
-
 Value Interpreter::eval_lambda(const LambdaExpr& expr) {
     FunctionValue fn;
     fn.name    = "<lambda>";
@@ -805,9 +748,6 @@ Value Interpreter::eval_lambda(const LambdaExpr& expr) {
 
     return Value(std::move(fn));
 }
-
-// ── Error helpers ──────────────────────────────────────────────────────────────
-
 CrashError Interpreter::make_error(CrashKind kind,
                                      Span location,
                                      std::string detail) const
@@ -844,15 +784,11 @@ void Interpreter::binary_type_error(const std::string& op,
     err.metadata["right"]    = value_type_name(right);
     throw err;
 }
-// ── current_function_name ──────────────────────────────────────────────────────
 
 std::string Interpreter::current_function_name() const {
     if (call_stack_.empty()) return "<main>";
     return call_stack_.back().function_name;
 }
-
-// ── Match expression ───────────────────────────────────────────────────────────
-
 Value Interpreter::eval_match(const MatchExpr& expr) {
     Value target = evaluate(*expr.target);
 

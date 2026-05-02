@@ -8,9 +8,6 @@
 #include <sstream>
 
 namespace crashlang {
-
-// ── User function caller mechanism ─────────────────────────────────────────────
-
 static UserFnCaller s_user_fn_caller;
 
 void set_user_fn_caller(UserFnCaller caller) {
@@ -20,9 +17,6 @@ void set_user_fn_caller(UserFnCaller caller) {
 const UserFnCaller& get_user_fn_caller() {
     return s_user_fn_caller;
 }
-
-// ── Helper macros ──────────────────────────────────────────────────────────────
-
 /// Register a built-in with fixed arity.
 #define BUILTIN(name_, arity_, fn_body_) \
     env.define(name_, Value(BuiltinValue{ \
@@ -40,9 +34,6 @@ const UserFnCaller& get_user_fn_caller() {
         CrashError _e(kind_, span, msg_); \
         throw _e; \
     } while (false)
-
-// ── Built-in implementations ───────────────────────────────────────────────────
-
 void register_builtins(Environment& env) {
 
     // print(args...) — print values space-separated, no trailing newline.

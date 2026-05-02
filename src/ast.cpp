@@ -3,15 +3,9 @@
 #include <sstream>
 
 namespace crashlang {
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
 static std::string indent_str(int level) {
     return std::string(static_cast<size_t>(level * 2), ' ');
 }
-
-// ── format_expr ────────────────────────────────────────────────────────────────
-
 std::string format_expr(const Expr& expr, int indent) {
     std::string pad = indent_str(indent);
 
@@ -134,9 +128,6 @@ std::string format_expr(const Expr& expr, int indent) {
         }
     }, expr.data);
 }
-
-// ── format_stmt ────────────────────────────────────────────────────────────────
-
 std::string format_stmt(const Stmt& stmt, int indent) {
     std::string pad = indent_str(indent);
 
@@ -215,9 +206,6 @@ std::string format_stmt(const Stmt& stmt, int indent) {
         }
     }, stmt.data);
 }
-
-// ── format_ast ─────────────────────────────────────────────────────────────────
-
 std::string format_ast(const Program& program) {
     std::string result = "Program";
     for (const auto& s : program.statements) {

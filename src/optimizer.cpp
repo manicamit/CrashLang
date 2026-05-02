@@ -4,17 +4,11 @@
 #include <cmath>
 
 namespace crashlang {
-
-// ── Public API ─────────────────────────────────────────────────────────────────
-
 void Optimizer::optimize(Program& program) {
     for (auto& stmt : program.statements) {
         optimize_stmt(stmt);
     }
 }
-
-// ── Statement optimization ─────────────────────────────────────────────────────
-
 void Optimizer::optimize_stmt(StmtPtr& stmt) {
     if (!stmt) return;
 
@@ -34,18 +28,16 @@ void Optimizer::optimize_stmt(StmtPtr& stmt) {
             optimize_expr(node.condition);
             optimize_stmt(node.then_branch);
             if (node.else_branch) optimize_stmt(node.else_branch);
-
-            // Dead branch elimination: if condition is a known literal.
             if (auto* lit = std::get_if<LiteralExpr>(&node.condition->data)) {
                 if (lit->value.type == TokenType::True) {
-                    // Replace the entire if statement with just the then branch.
+
                     stmt = std::move(node.then_branch);
                     count_++;
                 } else if (lit->value.type == TokenType::False) {
                     if (node.else_branch) {
                         stmt = std::move(node.else_branch);
                     } else {
-                        // Replace with empty block.
+
                         BlockStmt empty;
                         stmt = Stmt::make(std::move(empty), stmt->span);
                     }
@@ -72,13 +64,8 @@ void Optimizer::optimize_stmt(StmtPtr& stmt) {
         }
     }, stmt->data);
 }
-
-// ── Expression optimization ────────────────────────────────────────────────────
-
 void Optimizer::optimize_expr(ExprPtr& expr) {
     if (!expr) return;
-
-    // First optimize children.
     std::visit([&](auto&& node) {
         using T = std::decay_t<decltype(node)>;
 
@@ -111,8 +98,6 @@ void Optimizer::optimize_expr(ExprPtr& expr) {
             }
         }
     }, expr->data);
-
-    // Now try to fold this expression itself.
     auto& span = expr->span;
     if (auto* bin = std::get_if<BinaryExpr>(&expr->data)) {
         try_fold_binary(expr, *bin, span);
@@ -120,9 +105,6 @@ void Optimizer::optimize_expr(ExprPtr& expr) {
         try_fold_unary(expr, *un, span);
     }
 }
-
-// ── Constant folding: binary ───────────────────────────────────────────────────
-
 bool Optimizer::try_fold_binary(ExprPtr& expr, const BinaryExpr& bin, const Span& span) {
     auto* left_lit  = std::get_if<LiteralExpr>(&bin.left->data);
     auto* right_lit = std::get_if<LiteralExpr>(&bin.right->data);
@@ -198,8 +180,6 @@ bool Optimizer::try_fold_binary(ExprPtr& expr, const BinaryExpr& bin, const Span
         count_++;
         return true;
     }
-
-    // String + String concatenation.
     if (left_lit->value.type == TokenType::StringLiteral &&
         right_lit->value.type == TokenType::StringLiteral &&
         op == TokenType::Plus)
@@ -213,8 +193,6 @@ bool Optimizer::try_fold_binary(ExprPtr& expr, const BinaryExpr& bin, const Span
         count_++;
         return true;
     }
-
-    // Boolean logic: true and false => false, true or false => true, etc.
     if ((left_lit->value.type == TokenType::True || left_lit->value.type == TokenType::False) &&
         (right_lit->value.type == TokenType::True || right_lit->value.type == TokenType::False))
     {
@@ -238,16 +216,11 @@ bool Optimizer::try_fold_binary(ExprPtr& expr, const BinaryExpr& bin, const Span
 
     return false;
 }
-
-// ── Constant folding: unary ────────────────────────────────────────────────────
-
 bool Optimizer::try_fold_unary(ExprPtr& expr, const UnaryExpr& un, const Span& span) {
     auto* operand_lit = std::get_if<LiteralExpr>(&un.operand->data);
     if (!operand_lit) return false;
 
     auto op = un.op.type;
-
-    // Negate integer: -(42) => -42
     if (op == TokenType::Minus && operand_lit->value.type == TokenType::IntLiteral) {
         int64_t val = std::get<int64_t>(operand_lit->value.literal);
         LiteralExpr folded;
@@ -256,8 +229,6 @@ bool Optimizer::try_fold_unary(ExprPtr& expr, const UnaryExpr& un, const Span& s
         count_++;
         return true;
     }
-
-    // Negate float: -(3.14) => -3.14
     if (op == TokenType::Minus && operand_lit->value.type == TokenType::FloatLiteral) {
         double val = std::get<double>(operand_lit->value.literal);
         LiteralExpr folded;
@@ -266,8 +237,6 @@ bool Optimizer::try_fold_unary(ExprPtr& expr, const UnaryExpr& un, const Span& s
         count_++;
         return true;
     }
-
-    // Boolean not: not true => false
     if (op == TokenType::Not &&
         (operand_lit->value.type == TokenType::True || operand_lit->value.type == TokenType::False))
     {

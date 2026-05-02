@@ -2,9 +2,6 @@
 #include "crashlang/errors.hpp"
 
 namespace crashlang {
-
-// ── allocate ───────────────────────────────────────────────────────────────────
-
 HeapID HeapSimulator::allocate(std::string type_name,
                                 std::unordered_map<std::string, Value> fields,
                                 Span site,
@@ -23,9 +20,6 @@ HeapID HeapSimulator::allocate(std::string type_name,
     objects_.emplace(id, std::move(obj));
     return id;
 }
-
-// ── free ───────────────────────────────────────────────────────────────────────
-
 void HeapSimulator::free(HeapID id, Span site, std::string function_name) {
     auto it = objects_.find(id);
     if (it == objects_.end()) {
@@ -61,9 +55,6 @@ void HeapSimulator::free(HeapID id, Span site, std::string function_name) {
     obj.deallocation_site  = site;
     obj.freed_in_function  = std::move(function_name);
 }
-
-// ── read_field ─────────────────────────────────────────────────────────────────
-
 Value HeapSimulator::read_field(HeapID id, const std::string& field, Span site) const {
     auto it = objects_.find(id);
     if (it == objects_.end()) {
@@ -98,9 +89,6 @@ Value HeapSimulator::read_field(HeapID id, const std::string& field, Span site) 
 
     return field_it->second;
 }
-
-// ── write_field ────────────────────────────────────────────────────────────────
-
 void HeapSimulator::write_field(HeapID id, const std::string& field, Value value, Span site) {
     auto it = objects_.find(id);
     if (it == objects_.end()) {
@@ -126,9 +114,6 @@ void HeapSimulator::write_field(HeapID id, const std::string& field, Value value
 
     field_it->second = std::move(value);
 }
-
-// ── is_alive / exists ──────────────────────────────────────────────────────────
-
 bool HeapSimulator::is_alive(HeapID id) const {
     auto it = objects_.find(id);
     return it != objects_.end() && it->second.alive;
@@ -137,15 +122,9 @@ bool HeapSimulator::is_alive(HeapID id) const {
 bool HeapSimulator::exists(HeapID id) const {
     return objects_.count(id) > 0;
 }
-
-// ── get_object ─────────────────────────────────────────────────────────────────
-
 const HeapObject& HeapSimulator::get_object(HeapID id) const {
     return objects_.at(id);
 }
-
-// ── get_all_leaked ─────────────────────────────────────────────────────────────
-
 std::vector<const HeapObject*> HeapSimulator::get_all_leaked() const {
     std::vector<const HeapObject*> leaks;
     for (const auto& [_, obj] : objects_) {
@@ -155,9 +134,6 @@ std::vector<const HeapObject*> HeapSimulator::get_all_leaked() const {
     }
     return leaks;
 }
-
-// ── throw_use_after_free ───────────────────────────────────────────────────────
-
 void HeapSimulator::throw_use_after_free(HeapID id,
                                           Span site,
                                           const std::string& action) const

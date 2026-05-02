@@ -5,9 +5,6 @@
 #include <cstdlib>
 
 namespace crashlang {
-
-// ── Keyword table ──────────────────────────────────────────────────────────────
-
 const std::unordered_map<std::string, TokenType> Lexer::keywords_ = {
     {"true",     TokenType::True},
     {"false",    TokenType::False},
@@ -33,16 +30,10 @@ const std::unordered_map<std::string, TokenType> Lexer::keywords_ = {
     {"match",    TokenType::Match},
     {"when",     TokenType::When},
 };
-
-// ── Constructor ────────────────────────────────────────────────────────────────
-
 Lexer::Lexer(const SourceFile& source)
     : source_(source)
     , text_(source.source)
 {}
-
-// ── Character helpers ──────────────────────────────────────────────────────────
-
 bool Lexer::is_at_end() const {
     return current_ >= text_.size();
 }
@@ -66,9 +57,6 @@ bool Lexer::match(char expected) {
     ++current_;
     return true;
 }
-
-// ── Token production ───────────────────────────────────────────────────────────
-
 void Lexer::begin_token() {
     token_start_ = current_;
 }
@@ -94,9 +82,6 @@ void Lexer::add_error(const std::string& message) {
     had_errors_ = true;
     tokens_.push_back(Token::make_error(message, current_span()));
 }
-
-// ── Main scanning loop ─────────────────────────────────────────────────────────
-
 std::vector<Token> Lexer::scan_tokens() {
     tokens_.clear();
     current_ = 0;
@@ -114,9 +99,6 @@ std::vector<Token> Lexer::scan_tokens() {
 
     return tokens_;
 }
-
-// ── Single-token dispatch ──────────────────────────────────────────────────────
-
 void Lexer::scan_token() {
     char c = advance();
 
@@ -204,9 +186,6 @@ void Lexer::scan_token() {
             return;
     }
 }
-
-// ── String scanning ────────────────────────────────────────────────────────────
-
 void Lexer::scan_string() {
     std::string value;
 
@@ -255,9 +234,6 @@ void Lexer::scan_string() {
     auto span   = current_span();
     tokens_.push_back(Token::make_string(std::move(value), std::move(lexeme), span));
 }
-
-// ── Number scanning ────────────────────────────────────────────────────────────
-
 void Lexer::scan_number() {
     // Consume integer part.
     while (!is_at_end() && std::isdigit(static_cast<unsigned char>(peek()))) {
@@ -298,9 +274,6 @@ void Lexer::scan_number() {
         tokens_.push_back(Token::make_int(static_cast<int64_t>(value), std::move(lexeme), span));
     }
 }
-
-// ── Identifier / keyword scanning ──────────────────────────────────────────────
-
 void Lexer::scan_identifier() {
     while (!is_at_end()) {
         char c = peek();
@@ -322,9 +295,6 @@ void Lexer::scan_identifier() {
         tokens_.push_back(Token::make(TokenType::Identifier, std::move(lexeme), span));
     }
 }
-
-// ── Comment skipping ───────────────────────────────────────────────────────────
-
 void Lexer::skip_line_comment() {
     while (!is_at_end() && peek() != '\n') {
         advance();

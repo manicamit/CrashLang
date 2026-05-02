@@ -4,17 +4,11 @@
 #include <iomanip>
 
 namespace crashlang {
-
-// ── Value::to_float ────────────────────────────────────────────────────────────
-
 double Value::to_float() const {
     if (is_int())   return static_cast<double>(as_int());
     if (is_float()) return as_float();
     return 0.0;
 }
-
-// ── Value::operator== ──────────────────────────────────────────────────────────
-
 bool Value::operator==(const Value& other) const {
     return values_equal(*this, other);
 }
@@ -22,9 +16,6 @@ bool Value::operator==(const Value& other) const {
 bool Value::operator!=(const Value& other) const {
     return !(*this == other);
 }
-
-// ── value_type_name ────────────────────────────────────────────────────────────
-
 const char* value_type_name(const Value& v) {
     return std::visit([](auto&& val) -> const char* {
         using T = std::decay_t<decltype(val)>;
@@ -40,9 +31,6 @@ const char* value_type_name(const Value& v) {
         else return "unknown";
     }, v.data);
 }
-
-// ── value_to_string ────────────────────────────────────────────────────────────
-
 std::string value_to_string(const Value& v) {
     return std::visit([](auto&& val) -> std::string {
         using T = std::decay_t<decltype(val)>;
@@ -99,9 +87,6 @@ std::string value_to_string(const Value& v) {
         }
     }, v.data);
 }
-
-// ── value_is_truthy ────────────────────────────────────────────────────────────
-
 bool value_is_truthy(const Value& v) {
     return std::visit([](auto&& val) -> bool {
         using T = std::decay_t<decltype(val)>;
@@ -112,9 +97,6 @@ bool value_is_truthy(const Value& v) {
         else return true;
     }, v.data);
 }
-
-// ── values_equal ──────────────────────────────────────────────────────────────
-
 bool values_equal(const Value& a, const Value& b) {
     // Nil == Nil.
     if (a.is_nil() && b.is_nil()) return true;

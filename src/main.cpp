@@ -1,10 +1,13 @@
-/// CrashLang entry point — file runner and interactive REPL.
 
 #include "crashlang/ast.hpp"
+#include "crashlang/codegen.hpp"
 #include "crashlang/compiler.hpp"
 #include "crashlang/diagnostics.hpp"
 #include "crashlang/errors.hpp"
 #include "crashlang/interpreter.hpp"
+#include "crashlang/ir.hpp"
+#include "crashlang/ir_builder.hpp"
+#include "crashlang/ir_passes.hpp"
 #include "crashlang/lexer.hpp"
 #include "crashlang/optimizer.hpp"
 #include "crashlang/parser.hpp"
@@ -33,19 +36,16 @@ static void print_usage() {
         "  crashlang --vm <file.cl>          Execute via bytecode VM\n"
         "  crashlang --disasm <file.cl>      Dump compiled bytecode\n"
         "  crashlang --optimize <file.cl>    Run with constant folding\n"
+        "  crashlang --emit-ir <file.cl>      Dump register-based IR\n"
+        "  crashlang --emit-asm <file.cl>     Emit register-allocated assembly\n"
         "  crashlang --version               Show version\n"
         "  crashlang --help                  Show this help\n";
 }
-
-// ── REPL ───────────────────────────────────────────────────────────────────────
-
 static int run_repl(bool no_color) {
     std::cout << "CrashLang " << VERSION << " — interactive mode\n";
     std::cout << "Type expressions or statements. Use :quit or Ctrl-D to exit.\n\n";
 
     crashlang::DiagnosticsEngine diag(!no_color);
-
-    // A dummy source used for each line's diagnostics.
     auto dummy = crashlang::SourceFile("<repl>", "");
     crashlang::Interpreter interp(dummy);
 
@@ -116,14 +116,11 @@ static int run_repl(bool no_color) {
 
     return 0;
 }
-
-// ── File execution ─────────────────────────────────────────────────────────────
-
 static int run_file(const char* filename,
                      bool show_tokens, bool show_ast,
                      bool no_color, bool check_leaks,
                      bool use_vm, bool show_disasm,
-                     bool optimize)
+                     bool optimize, bool emit_ir, bool emit_asm)
 {
     auto source = crashlang::load_source_file(filename);
     if (!source) return 1;
@@ -169,6 +166,32 @@ static int run_file(const char* filename,
             std::cerr << "[optimizer] " << opt.optimizations_applied()
                       << " constant folding(s) applied.\n";
         }
+    }
+
+    // IR / assembly pipeline.
+    if (emit_ir || emit_asm) {
+        crashlang::IRBuilder builder;
+        auto ir_module = builder.build(program);
+
+        // Run DCE on each function.
+        for (auto& fn : ir_module.functions) {
+            dead_code_elimination(fn);
+        }
+
+        if (emit_ir) {
+            std::cout << ir_module.dump();
+            // Also show liveness info.
+            for (const auto& fn : ir_module.functions) {
+                auto liveness = compute_liveness(fn);
+                std::cout << "\n" << liveness.dump(fn);
+                auto alloc = allocate_registers(fn);
+                std::cout << "\n" << alloc.dump();
+            }
+            return 0;
+        }
+
+        std::cout << emit_assembly(ir_module);
+        return 0;
     }
 
     // ── VM path ────────────────────────────────────────────────────────────────
@@ -222,9 +245,6 @@ static int run_file(const char* filename,
 
     return 0;
 }
-
-// ── main ───────────────────────────────────────────────────────────────────────
-
 int main(int argc, char* argv[]) {
     bool        show_tokens = false;
     bool        show_ast    = false;
@@ -233,6 +253,8 @@ int main(int argc, char* argv[]) {
     bool        use_vm      = false;
     bool        show_disasm = false;
     bool        optimize    = false;
+    bool        emit_ir     = false;
+    bool        emit_asm    = false;
     const char* filename    = nullptr;
 
     for (int i = 1; i < argc; ++i) {
@@ -250,6 +272,10 @@ int main(int argc, char* argv[]) {
             show_disasm = true;
         } else if (std::strcmp(argv[i], "--optimize") == 0) {
             optimize = true;
+        } else if (std::strcmp(argv[i], "--emit-ir") == 0) {
+            emit_ir = true;
+        } else if (std::strcmp(argv[i], "--emit-asm") == 0) {
+            emit_asm = true;
         } else if (std::strcmp(argv[i], "--help") == 0
                 || std::strcmp(argv[i], "-h") == 0) {
             print_usage();
@@ -267,5 +293,5 @@ int main(int argc, char* argv[]) {
         return run_repl(no_color);
     }
 
-    return run_file(filename, show_tokens, show_ast, no_color, check_leaks, use_vm, show_disasm, optimize);
+    return run_file(filename, show_tokens, show_ast, no_color, check_leaks, use_vm, show_disasm, optimize, emit_ir, emit_asm);
 }

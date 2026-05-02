@@ -276,6 +276,60 @@ expect_success "Constant folding optimizer (VM)" \
     "25" \
     "--optimize --vm"
 
+# ── Phase 12: IR pipeline ──────────────────────────────────────────────────────
+
+bold "Phase 12: IR pipeline"
+echo ""
+
+# Helper: check that a command's output contains all given substrings.
+expect_output_contains() {
+    local name="$1"
+    shift
+    local cmd="$1"
+    shift
+
+    local output
+    if output=$(eval "$cmd" 2>&1); then
+        local all_ok=true
+        local missing=""
+        for pattern in "$@"; do
+            if ! echo "$output" | grep -qF "$pattern"; then
+                all_ok=false
+                missing="$pattern"
+                break
+            fi
+        done
+        if $all_ok; then
+            PASS=$((PASS + 1))
+            printf "  $(green "PASS")  %s\n" "$name"
+        else
+            FAIL=$((FAIL + 1))
+            ERRORS+="  FAIL: $name — missing: '$missing'\n"
+            printf "  $(red "FAIL")  %s — missing: '%s'\n" "$name" "$missing"
+        fi
+    else
+        FAIL=$((FAIL + 1))
+        ERRORS+="  FAIL: $name — command failed\n"
+        printf "  $(red "FAIL")  %s — command failed\n" "$name"
+    fi
+}
+
+expect_output_contains "--emit-ir output" \
+    "$BINARY --emit-ir tests/examples/ir_test.cl" \
+    "func @add" "add.i64" "ret %r" "cmp.gt" "br.if"
+
+expect_output_contains "--emit-asm output" \
+    "$BINARY --emit-asm tests/examples/ir_test.cl" \
+    ".func add" ".func factorial" "ret %p" ".reg"
+
+expect_output_contains "Liveness analysis" \
+    "$BINARY --emit-ir tests/examples/ir_test.cl" \
+    "Liveness for" "live_in" "live_out"
+
+expect_output_contains "Register allocation" \
+    "$BINARY --emit-ir tests/examples/ir_test.cl" \
+    "Register allocation" "%r0 -> %p0"
+
 # ── Summary ─────────────────────────────────────────────────────────────────────
 
 echo ""

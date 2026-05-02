@@ -5,9 +5,6 @@
 #include <sstream>
 
 namespace crashlang {
-
-// ── ANSI escape codes ──────────────────────────────────────────────────────────
-
 static constexpr const char* RESET     = "\033[0m";
 static constexpr const char* BOLD      = "\033[1m";
 static constexpr const char* DIM       = "\033[2m";
@@ -17,15 +14,9 @@ static constexpr const char* GREEN     = "\033[32m";
 static constexpr const char* YELLOW    = "\033[33m";
 static constexpr const char* CYAN      = "\033[36m";
 static constexpr const char* MAGENTA   = "\033[35m";
-
-// ── Constructor ────────────────────────────────────────────────────────────────
-
 DiagnosticsEngine::DiagnosticsEngine(bool use_color)
     : use_color_(use_color)
 {}
-
-// ── Color helpers ──────────────────────────────────────────────────────────────
-
 std::string DiagnosticsEngine::bold(const std::string& text) const {
     if (!use_color_) return text;
     return std::string(BOLD) + text + RESET;
@@ -65,9 +56,6 @@ std::string DiagnosticsEngine::magenta(const std::string& text) const {
     if (!use_color_) return text;
     return std::string(MAGENTA) + text + RESET;
 }
-
-// ── Box-drawing helpers ────────────────────────────────────────────────────────
-
 static std::string bar_top(const std::string& title, bool color) {
     std::string line = " RuntimeError: " + title + " ";
     size_t pad_len = static_cast<size_t>(std::max(60 - static_cast<int>(line.size()), 4));
@@ -90,61 +78,37 @@ static std::string pipe(bool color) {
     if (color) return std::string(DIM) + "|" + RESET;
     return "|";
 }
-
-// ── format_crash ───────────────────────────────────────────────────────────────
-
 std::string DiagnosticsEngine::format_crash(const CrashError& error,
                                               const SourceFile& source,
                                               const HeapSimulator& heap,
                                               const OwnershipTracker& ownership) const
 {
     std::ostringstream out;
-
-    // Top bar.
     out << bar_top(crash_kind_name(error.kind), use_color_) << '\n';
     out << pipe(use_color_) << '\n';
-
-    // Location.
     out << pipe(use_color_) << "  " << bold(error.location.to_string()) << '\n';
     out << pipe(use_color_) << '\n';
-
-    // Source context.
     out << format_source_context(error, source);
-
-    // What happened.
     out << format_what_happened(error);
-
-    // Object timeline (only for heap-related errors).
     if (error.related_object) {
         out << format_timeline(error, heap, ownership, source);
     }
-
-    // Call stack.
     if (!error.call_stack.empty()) {
         out << format_call_stack(error);
     }
-
-    // Why this is a problem.
     auto why = format_why(error);
     if (!why.empty()) {
         out << why;
     }
-
-    // Suggested fix.
     auto suggestion = format_suggestion(error);
     if (!suggestion.empty()) {
         out << suggestion;
     }
-
-    // Bottom bar.
     out << pipe(use_color_) << '\n';
     out << bar_bottom(use_color_) << '\n';
 
     return out.str();
 }
-
-// ── Source context ─────────────────────────────────────────────────────────────
-
 std::string DiagnosticsEngine::format_source_context(const CrashError& error,
                                                        const SourceFile& source) const
 {
@@ -153,29 +117,23 @@ std::string DiagnosticsEngine::format_source_context(const CrashError& error,
     uint32_t err_line = error.location.start.line;
     uint32_t err_col  = error.location.start.column;
     uint32_t end_col  = error.location.end.column;
-
-    // Show 2 lines before and the error line.
     uint32_t start_line = (err_line > 2) ? err_line - 2 : 1;
     uint32_t end_line   = err_line;
-
-    // Figure out line number width for alignment.
     int gutter_width = static_cast<int>(std::to_string(end_line).size());
 
     for (uint32_t ln = start_line; ln <= end_line; ++ln) {
         auto line_text = source.get_line(ln);
 
         if (ln == err_line) {
-            // Arrow line — the offending line.
+
             out << pipe(use_color_) << "  "
                 << bright_red("->") << " "
                 << dim(std::to_string(ln)) << " "
                 << dim("|") << " " << line_text << '\n';
-
-            // Caret line.
             std::string padding(static_cast<size_t>(gutter_width + 1), ' ');
             std::string carets;
             size_t caret_len = (end_col > err_col) ? end_col - err_col : 1;
-            // Make sure we have at least one caret.
+
             if (caret_len == 0) caret_len = 1;
             carets = std::string(caret_len, '^');
 
@@ -186,7 +144,7 @@ std::string DiagnosticsEngine::format_source_context(const CrashError& error,
             }
             out << bright_red(carets) << '\n';
         } else {
-            // Context line.
+
             out << pipe(use_color_) << "   "
                 << dim(std::to_string(ln)) << " "
                 << dim("|") << " " << line_text << '\n';
@@ -196,9 +154,6 @@ std::string DiagnosticsEngine::format_source_context(const CrashError& error,
     out << pipe(use_color_) << '\n';
     return out.str();
 }
-
-// ── What happened ──────────────────────────────────────────────────────────────
-
 std::string DiagnosticsEngine::format_what_happened(const CrashError& error) const {
     std::ostringstream out;
 
@@ -208,9 +163,6 @@ std::string DiagnosticsEngine::format_what_happened(const CrashError& error) con
 
     return out.str();
 }
-
-// ── Object timeline ────────────────────────────────────────────────────────────
-
 std::string DiagnosticsEngine::format_timeline(const CrashError& error,
                                                  const HeapSimulator& heap,
                                                  const OwnershipTracker& ownership,
@@ -234,8 +186,6 @@ std::string DiagnosticsEngine::format_timeline(const CrashError& error,
     for (const auto& event : timeline) {
         std::string line_str = std::to_string(event.location.start.line);
         std::string kind_str = ownership_event_kind_name(event.kind);
-
-        // Pad for alignment.
         while (line_str.size() < 4) line_str = " " + line_str;
         while (kind_str.size() < 8) kind_str += " ";
 
@@ -244,12 +194,8 @@ std::string DiagnosticsEngine::format_timeline(const CrashError& error,
             << yellow(kind_str) << "  "
             << dim("--") << " " << event.description << '\n';
     }
-
-    // Add the "you are here" marker for the crash site.
     std::string crash_line = std::to_string(error.location.start.line);
     while (crash_line.size() < 4) crash_line = " " + crash_line;
-
-    // Determine what kind of action was attempted.
     std::string action = "ACCESS";
     auto it = error.metadata.find("action");
     if (it != error.metadata.end()) {
@@ -267,22 +213,15 @@ std::string DiagnosticsEngine::format_timeline(const CrashError& error,
 
     out << pipe(use_color_) << '\n';
 
-    // Suppress unused parameter warning for heap — we access it
-    // through the ownership tracker's records.
     (void)heap;
     (void)source;
 
     return out.str();
 }
-
-// ── Call stack ──────────────────────────────────────────────────────────────────
-
 std::string DiagnosticsEngine::format_call_stack(const CrashError& error) const {
     std::ostringstream out;
 
     out << pipe(use_color_) << "  " << bold("Call stack:") << '\n';
-
-    // Print innermost last (reverse order).
     for (auto it = error.call_stack.rbegin(); it != error.call_stack.rend(); ++it) {
         out << pipe(use_color_) << "    "
             << cyan(it->function_name)
@@ -292,9 +231,6 @@ std::string DiagnosticsEngine::format_call_stack(const CrashError& error) const 
     out << pipe(use_color_) << '\n';
     return out.str();
 }
-
-// ── Why this is a problem ──────────────────────────────────────────────────────
-
 std::string DiagnosticsEngine::format_why(const CrashError& error) const {
     std::ostringstream out;
     std::string reason;
@@ -375,8 +311,6 @@ std::string DiagnosticsEngine::format_why(const CrashError& error) const {
     }
 
     out << pipe(use_color_) << "  " << bold("Why this is a problem:") << '\n';
-
-    // Wrap each line with the pipe character.
     std::istringstream iss(reason);
     std::string line;
     while (std::getline(iss, line)) {
@@ -386,9 +320,6 @@ std::string DiagnosticsEngine::format_why(const CrashError& error) const {
     out << pipe(use_color_) << '\n';
     return out.str();
 }
-
-// ── Suggested fix ──────────────────────────────────────────────────────────────
-
 std::string DiagnosticsEngine::format_suggestion(const CrashError& error) const {
     std::ostringstream out;
     std::string suggestion;
@@ -473,9 +404,6 @@ std::string DiagnosticsEngine::format_suggestion(const CrashError& error) const 
     out << pipe(use_color_) << '\n';
     return out.str();
 }
-
-// ── Memory leak report ─────────────────────────────────────────────────────────
-
 std::string DiagnosticsEngine::format_leaks(const HeapSimulator& heap,
                                               const OwnershipTracker& ownership,
                                               const SourceFile& source) const
@@ -500,8 +428,6 @@ std::string DiagnosticsEngine::format_leaks(const HeapSimulator& heap,
             << "  " << dim(obj->type_name)
             << "  allocated at " << obj->allocation_site.to_string()
             << "  in " << obj->allocated_in_function << '\n';
-
-        // Show the allocation line.
         auto line_text = source.get_line(obj->allocation_site.start.line);
         out << "    "
             << dim(std::to_string(obj->allocation_site.start.line) + " | ")

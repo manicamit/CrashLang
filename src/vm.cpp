@@ -5,9 +5,6 @@
 #include <iostream>
 
 namespace crashlang {
-
-// ── Constructor ────────────────────────────────────────────────────────────────
-
 VM::VM(const SourceFile& source)
     : source_(source)
 {
@@ -17,11 +14,8 @@ VM::VM(const SourceFile& source)
 }
 
 VM::~VM() = default;
-
-// ── Upvalue operations ──────────────────────────────────────────────────────────
-
 ObjUpvalue* VM::capture_upvalue(size_t stack_index) {
-    // Walk the open upvalue list to see if we already have one for this slot.
+
     ObjUpvalue* prev = nullptr;
     ObjUpvalue* curr = open_upvalues_;
     while (curr != nullptr && curr->stack_index > stack_index) {
@@ -29,10 +23,8 @@ ObjUpvalue* VM::capture_upvalue(size_t stack_index) {
         curr = curr->next;
     }
     if (curr != nullptr && curr->stack_index == stack_index) {
-        return curr; // Reuse existing upvalue.
+        return curr;
     }
-
-    // Create a new upvalue pointing at the stack slot.
     auto uv = std::make_unique<ObjUpvalue>();
     uv->stack_index = stack_index;
     uv->is_closed = false;
@@ -58,9 +50,6 @@ void VM::close_upvalues(size_t last) {
         uv->next = nullptr;
     }
 }
-
-// ── Stack operations ───────────────────────────────────────────────────────────
-
 void VM::push(Value value) {
     if (stack_.size() >= STACK_MAX) {
         throw make_error(CrashKind::StackOverflow, "value stack overflow");
@@ -81,9 +70,6 @@ Value& VM::peek(size_t distance) {
 void VM::pop_n(size_t count) {
     for (size_t i = 0; i < count; ++i) stack_.pop_back();
 }
-
-// ── Dispatch helpers ───────────────────────────────────────────────────────────
-
 uint8_t VM::read_byte() {
     return frame().chunk->code[frame().ip++];
 }
@@ -141,17 +127,10 @@ CrashError VM::make_error(CrashKind kind, const std::string& detail) const {
     }
     return err;
 }
-
-// ── Builtin registration ──────────────────────────────────────────────────────
-
 void VM::register_builtins() {
-    // We register builtins into an Environment temporarily, then extract
-    // them as globals. This reuses the existing builtin definitions.
     Environment env;
     crashlang::register_builtins(env);
 
-    // Extract all top-level definitions from the environment.
-    // We need to call env.get() for each known builtin name.
     static const char* builtin_names[] = {
         "print", "println", "len", "type_of", "to_string", "to_int", "to_float",
         "assert", "push", "pop", "range", "input", "clock", "sqrt", "abs",
@@ -168,9 +147,6 @@ void VM::register_builtins() {
         }
     }
 }
-
-// ── Execute ────────────────────────────────────────────────────────────────────
-
 void VM::execute(Chunk& chunk) {
     VMFrame top;
     top.chunk = &chunk;
@@ -181,9 +157,6 @@ void VM::execute(Chunk& chunk) {
 
     run();
 }
-
-// ── Main dispatch loop ─────────────────────────────────────────────────────────
-
 void VM::run() {
     for (;;) {
         auto op = static_cast<OpCode>(read_byte());
@@ -367,7 +340,7 @@ void VM::run() {
             Value& callee = peek(argc);
 
             if (callee.is_builtin()) {
-                // Call built-in function.
+
                 auto& builtin = callee.as_builtin();
                 if (builtin.arity >= 0 && argc != builtin.arity) {
                     throw make_error(CrashKind::ArityMismatch,
@@ -404,7 +377,7 @@ void VM::run() {
                 new_frame.ip    = 0;
                 new_frame.base  = stack_.size() - argc - 1;
                 new_frame.name  = fn.name;
-                // Copy upvalues from the closure.
+
                 if (fn.vm_upvalues) {
                     new_frame.upvalues = *fn.vm_upvalues;
                 }
@@ -419,8 +392,6 @@ void VM::run() {
 
         case OpCode::Return: {
             Value result = pop();
-
-            // Close any open upvalues in this frame's stack window.
             size_t base = frame().base;
             close_upvalues(base);
             frames_.pop_back();
@@ -437,8 +408,6 @@ void VM::run() {
         case OpCode::Closure: {
             Value fn_val = read_constant();
             uint8_t upvalue_count = read_byte();
-
-            // Read upvalue descriptors and capture.
             std::vector<ObjUpvalue*> upvalues(upvalue_count);
             for (uint8_t i = 0; i < upvalue_count; ++i) {
                 uint8_t is_local = read_byte();
@@ -450,8 +419,6 @@ void VM::run() {
                 }
             }
 
-            // Store upvalues in a shared vector attached to the function value.
-            // We push the function, then when it's called, we retrieve its upvalues.
             if (fn_val.is_function()) {
                 auto& fn = const_cast<FunctionValue&>(fn_val.as_function());
                 fn.vm_upvalues = std::make_shared<std::vector<ObjUpvalue*>>(std::move(upvalues));
@@ -548,8 +515,6 @@ void VM::run() {
             uint16_t type_idx = read_short();
             uint8_t field_count = read_byte();
             std::string type_name = value_to_string(frame().chunk->constants[type_idx]);
-
-            // Pop field names (in reverse), then field values.
             std::vector<std::string> field_names(field_count);
             for (size_t i = field_count; i > 0; --i) {
                 field_names[i - 1] = pop().as_string();
@@ -611,7 +576,7 @@ void VM::run() {
         case OpCode::Ref: {
             Value obj = pop();
             if (!obj.is_heap_ref()) throw make_error(CrashKind::TypeMismatch, "ref() requires a heap object");
-            push(obj); // ref() just copies the reference.
+            push(obj);
             break;
         }
 
@@ -632,7 +597,7 @@ void VM::run() {
 
         case OpCode::Move: {
             Value obj = pop();
-            push(obj); // Move returns the value; source invalidation is handled at the variable level.
+            push(obj);
             break;
         }
 
@@ -661,7 +626,7 @@ void VM::run() {
 
         case OpCode::Print: {
             uint8_t argc = read_byte();
-            // Collect args (they're on the stack in order).
+
             std::vector<Value> args(argc);
             for (size_t i = argc; i > 0; --i) {
                 args[i - 1] = pop();

@@ -3,16 +3,10 @@
 #include <sstream>
 
 namespace crashlang {
-
-// ── Constructor ────────────────────────────────────────────────────────────────
-
 Parser::Parser(std::vector<Token> tokens, const SourceFile* source)
     : tokens_(std::move(tokens))
     , source_(source)
 {}
-
-// ── Token navigation ───────────────────────────────────────────────────────────
-
 const Token& Parser::peek() const {
     return tokens_[current_];
 }
@@ -95,9 +89,6 @@ void Parser::synchronize() {
         advance();
     }
 }
-
-// ── Error formatting ───────────────────────────────────────────────────────────
-
 std::string Parser::format_errors() const {
     std::ostringstream os;
     for (const auto& err : errors_) {
@@ -119,9 +110,6 @@ std::string Parser::format_errors() const {
     }
     return os.str();
 }
-
-// ── Top-level: parse() ────────────────────────────────────────────────────────
-
 Program Parser::parse() {
     Program program;
 
@@ -134,9 +122,6 @@ Program Parser::parse() {
 
     return program;
 }
-
-// ── Declaration parsing ────────────────────────────────────────────────────────
-
 StmtPtr Parser::parse_declaration() {
     try {
         if (check(TokenType::Let))  return parse_let_stmt();
@@ -198,9 +183,6 @@ StmtPtr Parser::parse_fn_stmt() {
     node.body = std::move(body);
     return Stmt::make(std::move(node), span);
 }
-
-// ── Statement parsing ──────────────────────────────────────────────────────────
-
 StmtPtr Parser::parse_statement() {
     if (check(TokenType::If))       return parse_if_stmt();
     if (check(TokenType::While))    return parse_while_stmt();
@@ -357,7 +339,6 @@ StmtPtr Parser::parse_expr_stmt() {
     return Stmt::make(std::move(node), span);
 }
 
-// ── Expression parsing ─────────────────────────────────────────────────────────
 //
 // Precedence (lowest to highest):
 //   Assignment  =

@@ -4,9 +4,6 @@
 #include <sstream>
 
 namespace crashlang {
-
-// ── Opcode metadata ────────────────────────────────────────────────────────────
-
 const char* opcode_name(OpCode op) {
     switch (op) {
         case OpCode::Constant:     return "OP_CONSTANT";
@@ -121,9 +118,6 @@ int opcode_operand_width(OpCode op) {
     }
     return 0;
 }
-
-// ── Chunk methods ──────────────────────────────────────────────────────────────
-
 void Chunk::emit(OpCode op, uint32_t line) {
     code.push_back(static_cast<uint8_t>(op));
     lines.push_back(line);
@@ -176,9 +170,6 @@ void Chunk::emit_loop(size_t loop_start, uint32_t line) {
     size_t offset = code.size() - loop_start + 3; // +3 for the loop instruction itself
     emit_wide(OpCode::Loop, static_cast<uint16_t>(offset), line);
 }
-
-// ── Disassembly ────────────────────────────────────────────────────────────────
-
 std::string Chunk::disassemble() const {
     std::ostringstream out;
     out << "== " << name << " ==\n";

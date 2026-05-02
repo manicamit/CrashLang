@@ -4,9 +4,6 @@
 #include <limits>
 
 namespace crashlang {
-
-// ── Levenshtein distance helper ────────────────────────────────────────────────
-
 static size_t levenshtein(const std::string& a, const std::string& b) {
     const size_t m = a.size();
     const size_t n = b.size();
@@ -30,9 +27,6 @@ static size_t levenshtein(const std::string& a, const std::string& b) {
 
     return prev[n];
 }
-
-// ── Scope ──────────────────────────────────────────────────────────────────────
-
 void Scope::define(const std::string& name, Value value) {
     bindings_[name] = std::move(value);
 }
@@ -103,9 +97,6 @@ std::optional<std::string> Scope::find_closest(const std::string& name) const {
     }
     return std::nullopt;
 }
-
-// ── Environment ────────────────────────────────────────────────────────────────
-
 Environment::Environment() {
     // Start with a global scope.
     current_ = std::make_shared<Scope>(nullptr, "<global>");
