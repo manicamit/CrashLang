@@ -695,6 +695,38 @@ ExprPtr Parser::parse_primary() {
         return Expr::make(std::move(node), span);
     }
 
+    // ── Lambda: fn(params) { body } ─────────────────────────────────────────────
+    if (check(TokenType::Fn)) {
+        // Peek ahead: if fn is followed by '(' it's a lambda, not a statement.
+        // (Statement fn has an identifier after 'fn'.)
+        if (current_ + 1 < tokens_.size()
+            && tokens_[current_ + 1].type == TokenType::LParen)
+        {
+            auto fn_tok = advance(); // Consume 'fn'.
+            expect(TokenType::LParen, "expected '(' after 'fn' in lambda");
+
+            std::vector<Token> params;
+            if (!check(TokenType::RParen)) {
+                do {
+                    auto& param = expect(TokenType::Identifier, "expected parameter name");
+                    params.push_back(param);
+                } while (match(TokenType::Comma));
+            }
+
+            expect(TokenType::RParen, "expected ')' after lambda parameters");
+
+            auto body = parse_block();
+            if (!body) return nullptr;
+
+            auto span = Span::merge(fn_tok.span, previous().span);
+            LambdaExpr node;
+            node.keyword = fn_tok;
+            node.params  = std::move(params);
+            node.body    = std::move(body);
+            return Expr::make(std::move(node), span);
+        }
+    }
+
     // ── Error ──────────────────────────────────────────────────────────────────
     error("expected expression, got '" + peek().lexeme + "'");
     synchronize();

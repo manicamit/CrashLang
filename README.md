@@ -5,62 +5,45 @@ A programming language where every runtime error explains itself.
 Most languages fail you with something like `Segmentation fault (core dumped)`. No context, no cause, no fix. CrashLang is built around a different idea: when your program crashes, the crash report should tell you exactly what went wrong, where, why, and how to fix it.
 
 ```
-RuntimeError: UseAfterFree
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  What happened:
-    You tried to read field 'data' on object 'buf',
-    but 'buf' was already freed.
-
-  Object lifetime:
-    line 7   new()        buf allocated (id: heap#003)
-    line 8   call         buf passed into parse_tokens()
-    line 11  free()       buf freed inside parse_tokens()
-    line 9   READ         <- you are here (after free)
-
-  Why this is a problem:
-    The memory backing 'buf' was released at line 11.
-    Accessing it afterward reads memory that may have been
-    reclaimed or overwritten by another allocation.
-
-  Suggested fix:
-    Read buf.data before passing buf into parse_tokens(),
-    or restructure parse_tokens() so it doesn't free its
-    argument.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
++-- RuntimeError: UseAfterFree ----------------------------------+
+|
+|  examples/05_use_after_free.cl:9:15
+|
+|   7 |
+|   8 | // This should crash with UseAfterFree
+|  -> 9 | let val = buf.data;
+|       |               ^^^
+|
+|  What happened:
+|    tried to read field 'data' on 'Buffer' (heap#1), but it was already freed
+|
+|  Object lifetime [heap#1]:
+|    line    3  new()     -- buf allocated as Buffer
+|    line    4  READ      -- buf.data read
+|    line    6  free()    -- buf freed
+|    line    9  READ      -- buf.data read
+|  -> line    9  read field 'data'  <- you are here (after free)
+|
+|  Why this is a problem:
+|    The memory backing this object was released at line 6.
+|    Accessing it afterward reads memory that may have been
+|    reclaimed or overwritten by another allocation.
+|
+|  Suggested fix:
+|    Read the field before calling free(), or restructure
+|    the code so the object is not accessed after being freed.
+|
+|
++--------------------------------------------------------------+
 ```
 
 That is the entire point of this project.
 
 ## What is this
 
-CrashLang is an interpreted language implemented in C++17. It has a simulated heap with explicit `new`/`free` semantics, an ownership tracker that records every object's full lifetime, and a diagnostics engine that turns internal errors into structured, human-readable crash reports.
+CrashLang is an interpreted language implemented in C++17. It has a simulated heap with explicit `new`/`free` semantics, an ownership tracker that records every object's full lifetime, and a diagnostics engine that turns runtime errors into structured, human-readable crash reports.
 
-The same design philosophy behind Rust's compiler errors and Clang's diagnostics — errors should explain themselves — applied from the ground up to a language runtime.
-
-## Current status
-
-The front-end (lexer, AST, parser) is complete. Interpreter is next.
-
-**What works right now:**
-- Full tokenizer with position tracking for every token
-- Source file model with O(1) line lookup (for pointing at code in error messages)
-- All operators, keywords, literals (int, float, string with escapes), identifiers
-- Line comments (`//`), nested block comments (`/* ... /* ... */ ... */`)
-- Error recovery in the lexer (malformed input produces error tokens, doesn't crash the scanner)
-- Full AST — every expression and statement type as a `std::variant` node carrying its source span
-- Recursive descent parser with Pratt-style precedence climbing for expressions
-- Parses all language constructs: functions, control flow, arrays, structs, memory ops, for-in loops, else-if chains
-- Parser error recovery — synchronizes to next statement boundary and continues, reporting all errors in one pass
-- `--ast` flag dumps the full parsed tree, `--tokens` flag dumps the token stream
-
-**What's coming:**
-- Tree-walk interpreter with lexical scoping
-- Simulated heap with allocation/deallocation tracking
-- Ownership tracker (simplified Rust-style move semantics)
-- The diagnostics engine (the whole point)
-- REPL, `--trace` flag, example programs for each error type
+The same design philosophy behind Rust's compiler errors and Clang's diagnostics -- errors should explain themselves -- applied from the ground up to a language runtime.
 
 ## Building
 
@@ -80,37 +63,68 @@ cmake --build build
 
 ## Usage
 
-Parse a file and report the statement count:
+Run a program:
 
 ```
 ./build/crashlang examples/01_hello_world.cl
 ```
 
-Dump the full AST:
+Start the interactive REPL:
 
 ```
-./build/crashlang --ast examples/02_parser_test.cl
+./build/crashlang
 ```
 
-Dump the raw token stream:
+```
+CrashLang 0.3.0 — interactive mode
+Type expressions or statements. Use :quit or Ctrl-D to exit.
+
+crash> let x = 42;
+crash> println(x * 2);
+84
+crash> :quit
+Goodbye.
+```
+
+Check for memory leaks at exit:
 
 ```
-./build/crashlang --tokens examples/01_hello_world.cl
+./build/crashlang --check-leaks examples/10_memory_leak.cl
 ```
 
-The interpreter isn't wired up yet, so programs don't execute. That's the next step.
+Other flags:
+
+```
+--tokens <file>     Dump token stream
+--ast <file>        Dump AST
+--no-color <file>   Disable ANSI colors
+--version           Show version
+--help              Show help
+```
 
 ## Language syntax
 
 ```
+// Variables and types
 let x = 42;
 let name = "crashlang";
 let flag = true;
+let items = [1, 2, 3];
 
+// Functions
 fn add(a, b) {
     return a + b;
 }
 
+// Lambdas (anonymous functions)
+let double = fn(x) { return x * 2; };
+
+// Closures
+fn make_adder(n) {
+    return fn(x) { return x + n; };
+}
+
+// Control flow
 if x > 10 {
     println("big");
 } else {
@@ -121,32 +135,91 @@ while x > 0 {
     x = x - 1;
 }
 
+for item in items {
+    println(item);
+}
+
+// String iteration
+for ch in "hello" {
+    print(ch);
+}
+
+// String indexing
+let first = name[0];
+
 // Memory operations
 let p = new Point { x: 1, y: 2 };
+println(p.x);
+p.x = 10;
 let r = ref(p);
 let val = deref(r);
 free(p);
 
-// Ownership transfer — p is no longer valid after this
+// Ownership transfer
 let q = move(p);
+// p is now nil -- using it will crash with a diagnostic
 ```
 
-## Error types
+## Built-in functions
 
-The diagnostics engine will detect and explain all of these at runtime:
+| Function | Description |
+|---|---|
+| `println(args...)` | Print values with newline |
+| `print(args...)` | Print values without newline |
+| `len(val)` | Length of string or array |
+| `type_of(val)` | Type name as string |
+| `to_string(val)` | Convert to string |
+| `to_int(val)` | Convert to integer |
+| `to_float(val)` | Convert to float |
+| `assert(cond, msg?)` | Crash if condition is false |
+| `push(arr, val)` | Append to array |
+| `pop(arr)` | Remove and return last element |
+| `range(start, end)` | Generate integer array |
+| `input(prompt?)` | Read a line from stdin |
+| `clock()` | Seconds since epoch |
+| `sqrt(n)`, `abs(n)` | Math functions |
+| `max(a, b)`, `min(a, b)` | Numeric comparison |
+| `upper(s)`, `lower(s)` | Case conversion |
+| `trim(s)` | Strip whitespace |
+| `contains(s, sub)` | Substring check |
+| `starts_with(s, pre)` | Prefix check |
+| `ends_with(s, suf)` | Suffix check |
+| `replace(s, old, new)` | Replace all occurrences |
+| `substr(s, start, len?)` | Extract substring |
+| `split(s, delim)` | Split string into array |
+| `join(arr, sep)` | Join array into string |
+| `chars(s)` | String to char array |
+| `reverse(val)` | Reverse string or array |
+
+## Error detection
+
+All of these are detected at runtime with structured crash reports:
 
 | Error | What it catches |
 |---|---|
 | UseAfterFree | Accessing an object after `free()` was called on it |
 | DoubleFree | Calling `free()` on an already-freed object |
 | NullDereference | Dereferencing a reference that was never assigned |
-| OutOfBounds | Array index outside allocated range |
+| OutOfBounds | Array or string index outside valid range |
 | OwnershipViolation | Using a moved value after ownership transfer |
 | DivisionByZero | Dividing by zero |
 | TypeMismatch | Operator applied to incompatible types |
 | UndefinedVariable | Variable not in scope (with "did you mean?" suggestions) |
 | StackOverflow | Unbounded recursion past the call depth limit |
-| MemoryLeak | Allocations never freed (reported at program exit) |
+| MemoryLeak | Allocations never freed (reported with `--check-leaks`) |
+
+Each crash report includes:
+- Source context with the offending line highlighted
+- Plain-English "What happened" description
+- Object lifetime timeline showing every event from allocation to crash
+- Technical "Why this is a problem" explanation
+- Actionable "Suggested fix" recommendation
+
+## Running tests
+
+```
+bash tests/run_tests.sh
+```
 
 ## Project structure
 
@@ -159,21 +232,44 @@ CrashLang/
 │   ├── token.hpp           # Token types and Token struct
 │   ├── lexer.hpp           # Scanner
 │   ├── ast.hpp             # AST node types (variant-based)
-│   └── parser.hpp          # Recursive descent parser
+│   ├── parser.hpp          # Recursive descent parser
+│   ├── value.hpp           # Runtime value representation
+│   ├── environment.hpp     # Lexical scope chain
+│   ├── errors.hpp          # Error kinds and CrashError struct
+│   ├── interpreter.hpp     # Tree-walk interpreter
+│   ├── builtins.hpp        # Built-in function registry
+│   ├── heap.hpp            # Simulated heap with lifetime tracking
+│   ├── ownership.hpp       # Ownership and event timeline tracking
+│   └── diagnostics.hpp     # Crash report formatter
 ├── src/
-│   ├── main.cpp            # Entry point and CLI flag handling
+│   ├── main.cpp            # Entry point, CLI, and REPL
 │   ├── source.cpp          # Source file implementation
 │   ├── token.cpp           # Token utilities
 │   ├── lexer.cpp           # Scanner implementation
 │   ├── ast.cpp             # AST pretty-printer
-│   └── parser.cpp          # Parser implementation
-└── examples/
-    ├── 00_lexer_test.cl    # Exercises all token types
-    ├── 01_hello_world.cl   # Basic program
-    └── 02_parser_test.cl   # Exercises all syntax constructs
+│   ├── parser.cpp          # Parser implementation
+│   ├── value.cpp           # Value display and coercion
+│   ├── environment.cpp     # Scope management
+│   ├── errors.cpp          # Error utilities
+│   ├── interpreter.cpp     # Interpreter implementation
+│   ├── builtins.cpp        # Built-in function implementations
+│   ├── heap.cpp            # Heap simulator
+│   ├── ownership.cpp       # Ownership tracker
+│   └── diagnostics.cpp     # Diagnostics engine
+├── examples/
+│   ├── 01_hello_world.cl   # Fibonacci, arrays, closures, sorting
+│   ├── 03_error_test.cl    # Deliberate type mismatch across call stack
+│   ├── 04_heap_basic.cl    # Heap allocation, fields, ref, deref, free
+│   ├── 05_use_after_free.cl# Use-after-free detection
+│   ├── 06_double_free.cl   # Double-free detection
+│   ├── 07_ownership.cl     # Use-after-move detection
+│   ├── 08_null_deref.cl    # Null dereference detection
+│   ├── 09_flagship.cl      # Cross-function use-after-free
+│   ├── 10_memory_leak.cl   # Memory leak detection
+│   └── 11_advanced.cl      # Lambdas, string ops, closures
+└── tests/
+    └── run_tests.sh        # Automated test runner (16 tests)
 ```
-
-Interpreter, heap simulator, ownership tracker, and diagnostics engine will be added in subsequent commits.
 
 ## License
 

@@ -106,6 +106,16 @@ std::string format_expr(const Expr& expr, int indent) {
             result += format_expr(*node.operand, indent + 1);
             return result;
         }
+        else if constexpr (std::is_same_v<T, LambdaExpr>) {
+            std::string result = pad + "Lambda(";
+            for (size_t i = 0; i < node.params.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += node.params[i].lexeme;
+            }
+            result += ")\n";
+            result += format_stmt(*node.body, indent + 1);
+            return result;
+        }
         else {
             return pad + "<unknown expr>";
         }

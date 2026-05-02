@@ -115,6 +115,13 @@ struct MoveExpr {
     ExprPtr operand;
 };
 
+/// Anonymous function: `fn(x, y) { x + y }`.
+struct LambdaExpr {
+    Token              keyword; // 'fn'.
+    std::vector<Token> params;
+    StmtPtr            body;   // Always a BlockStmt.
+};
+
 /// The variant holding all expression types.
 using ExprData = std::variant<
     LiteralExpr,
@@ -129,7 +136,8 @@ using ExprData = std::variant<
     NewExpr,
     RefExpr,
     DerefExpr,
-    MoveExpr
+    MoveExpr,
+    LambdaExpr
 >;
 
 /// An expression node. Wraps ExprData + source Span.
